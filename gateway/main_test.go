@@ -121,3 +121,25 @@ func TestAnalyticsRouteProxiesToAnalyticsService(t *testing.T) {
 		t.Fatalf("unexpected body: %q", string(body))
 	}
 }
+
+func TestUnknownRouteReturns404WithoutCallingUpstreams(t *testing.T) {
+	handler := buildGatewayForTest(t, "test-key", func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("orders upstream should not be called for unknown route")
+	}, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("analytics upstream should not be called for unknown route")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/not-a-route", nil)
+	req.Header.Set("X-API-Key", "test-key")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	res := rec.Result()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", res.StatusCode)
+	}
+	if !strings.Contains(string(body), "Route not found") {
+		t.Fatalf("expected body to contain 'Route not found', got %q", string(body))
+	}
+}
